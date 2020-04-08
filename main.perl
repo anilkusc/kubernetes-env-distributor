@@ -29,39 +29,39 @@ $value = @values[0];
 push(@value_array, $value);
 }
 
-#print is_it_available("test2.yaml",\@value_array);
-#add_env("test2.yaml",\@value_array,0,"secrets.yaml");
-#We have our env variables as array
+#add_value("test3.yaml",1,"anil","secrets.yaml");
 
-add_value("test3.yaml",1,"anil","secrets.yaml");
 #TODO:after reformat yaml it is converting int to string.Prevent this.
 #TODO:reformat it for kubernets yaml
 #TODO:include(if there is value in include list only append it) and exclude list for yaml files
 #TODO:include and exclude list for stringData in secrets.yaml
+#TODO:more options.
 
 
+@indexes = check_kind("test1.yaml");
 
-#create format
-#format FROMSECRET =
-#- name: @<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<  
-#$val1
-#  valueFrom:
-#    secretKeyRef:
-#      name: common
-#      key: @<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-# $val2   
-#.#
+foreach $index (@indexes) {
+print "----------" .$index; 
+if(check_isthere_env("test1.yaml",$index)){
+################
+foreach $value (@value_array){
+if (is_it_available("test1.yaml",$value)){
+#TODO: add env
 
-#open(FILE, ">file.txt"); 
-#select FILE; 
-##$~ = FROMSECRET; 
-#for(@value_array){ 
-#$val1 = $_;
-#$val2 = $_; 
-#$~ = 'FROMSECRET';
-#write;
-#}
-#close FILE; 
+add_value("test1.yaml",$index,$value,"secrets.yaml");
+
+
+}else{ print "it is not available"}
+################
+}
+
+}else{
+  add_env("test1.yaml",\@value_array,$index,$yaml_secret);
+}
+
+}
+
+
 
 sub check_kind{
   my $yaml_kind =  YAML::Tiny->read( @_[0] );
@@ -87,7 +87,7 @@ return @indexes;
 sub check_isthere_env{
    my $yaml =  YAML::Tiny->read( @_[0] );
 
-   if($yaml->[$_[1]]->{spec}->{template}->{spec}->{containers}->[0]->{env}){ 
+   if($yaml->[@_[1]]->{spec}->{template}->{spec}->{containers}->[0]->{env}){ 
    return 1;
    } else{
    return 0;
@@ -109,27 +109,16 @@ sub check_dublicated_env{
 }
   
 sub is_it_available{
-my @value_array = @{$_[1]};
+
+my $value = @_[1];
 my @valid_kinds = check_kind(@_[0]);
-#return -1,0,1
+
 foreach $valid_kind (@valid_kinds) {
-
- if(check_isthere_env(@_[0], $valid_kind )){
-    foreach $value (@value_array){
     if(check_dublicated_env(@_[0], $value , $valid_kind)){
-       return 0;#there is same value on the env section.do nothing  
-     }else{
-       return 1;#there is env section and there is not same value on env section.add new value.
+       return 0;#there is same value on the env section.do nothing      
      }
-     
-     }
- }else{
-    return -1;#start add_env subroutine
- }
-
-
-} 
-return 1;
+}
+return 1;#there is env section and there is not same value on env section.add new value. 
 } 
 
 sub add_env{
@@ -151,7 +140,7 @@ sub add_env{
   } 
 
 sub add_value{
- 
+
   #yaml_file,yaml_indexes,value,secret
   my $yaml =  YAML::Tiny->read( @_[0] );
   my $yaml_secret = YAML::Tiny->read( @_[3] );
@@ -162,10 +151,34 @@ sub add_value{
   while($yaml->[@_[1]]->{spec}->{template}->{spec}->{containers}->[0]->{env}->[$i]){
     $i++;
   } 
-
+print "\nadded:" . $value; 
   $yaml->[@_[1]]->{spec}->{template}->{spec}->{containers}->[0]->{env}->[$i]->{name} = $value;
   $yaml->[@_[1]]->{spec}->{template}->{spec}->{containers}->[0]->{env}->[$i]->{valueFrom}->{secretKeyRef}->{name} = $yaml_secret->[0]->{metadata}->{name};
   $yaml->[@_[1]]->{spec}->{template}->{spec}->{containers}->[0]->{env}->[$i]->{valueFrom}->{secretKeyRef}->{key} = $value ;       
   $yaml->write( $dirname . @_[0] );
 
 } 
+
+
+
+#create format
+#format FROMSECRET =
+#- name: @<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<  
+#$val1
+#  valueFrom:
+#    secretKeyRef:
+#      name: common
+#      key: @<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+# $val2   
+#.#
+
+#open(FILE, ">file.txt"); 
+#select FILE; 
+##$~ = FROMSECRET; 
+#for(@value_array){ 
+#$val1 = $_;
+#$val2 = $_; 
+#$~ = 'FROMSECRET';
+#write;
+#}
+#close FILE; 
