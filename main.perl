@@ -2,10 +2,8 @@
 
 #perl -MCPAN -e 'install YAML::Tiny'
 use YAML::Tiny;
-#take the yaml files 
-@files = glob( $dir . './*' );
-@yamls = grep(/yaml/, @files); 
-#
+
+
 $dirname ="./newdir/";
 mkdir $dirname, 0755;
 
@@ -29,45 +27,47 @@ $value = @values[0];
 push(@value_array, $value);
 }
 
-#add_value("test3.yaml",1,"anil","secrets.yaml");
+#take the yaml files 
+@files = glob( $dir . './*' );
+@yamls = grep(/yaml/, @files);
+foreach $yaml (@yamls){
+  $yaml = substr($yaml,2);
+}
 
-#TODO:after reformat yaml it is converting int to string.Prevent this.
-#TODO:reformat it for kubernets yaml
+#TODO:after reformat yaml it is converting int to string.Prevent this.(Tek tırnakları sil)
+#TODO:reformat it for kubernetes yaml
 #TODO:include(if there is value in include list only append it) and exclude list for yaml files
 #TODO:include and exclude list for stringData in secrets.yaml
 #TODO:more options.
 
 
-@indexes = check_kind("test1.yaml");
+#=pod
+foreach $yaml (@yamls) {
+
+@indexes = check_kind($yaml);
 
 foreach $index (@indexes) {
-print "----------" .$index; 
-if(check_isthere_env("test1.yaml",$index)){
-################
-foreach $value (@value_array){
-if (is_it_available("test1.yaml",$value)){
-#TODO: add env
+  
+if(check_isthere_env($yaml,$index)){
 
-add_value("test1.yaml",$index,$value,"secrets.yaml");
+my @filtered_array = check_dublicated_env($yaml,\@value_array,$index);
 
-
-}else{ print "it is not available"}
-################
-}
+add_value($yaml,$secret_file,\@filtered_array,$index);
 
 }else{
-  add_env("test1.yaml",\@value_array,$index,$yaml_secret);
+  add_env($yaml,\@value_array,$index,$secret_file);
 }
-
 }
-
-
+}
+#=cut
 
 sub check_kind{
+  
   my $yaml_kind =  YAML::Tiny->read( @_[0] );
   my $i=0;
   @indexes=();
   @kinds=( "Deployment" , "StatefulSet" , "Pod" , "CronJob" , "Job");
+
   while($yaml_kind->[$i]) { 
  
   foreach $kind (@kinds) {
@@ -76,8 +76,8 @@ sub check_kind{
   #check if it is valid.Deployment ,StatefulSet...
   if ( $check_kind->[0]->{kind} eq $yaml_kind->[$i]->{kind} ) {
   push(@indexes, $i);
-   
-  }
+  }else{next;}
+
 }
 $i++;  
 }
@@ -86,26 +86,37 @@ return @indexes;
 
 sub check_isthere_env{
    my $yaml =  YAML::Tiny->read( @_[0] );
-
-   if($yaml->[@_[1]]->{spec}->{template}->{spec}->{containers}->[0]->{env}){ 
-   return 1;
-   } else{
-   return 0;
-   } 
+   my $check = Dump($yaml->[@_[1]]->{spec}->{template}->{spec}->{containers});  
+       if($check =~ m/env:/ ){ 
+       return 1;
+       } else{
+       return 0;
+       }
 }  
- 
+
+#yaml,values_array,indexes 
 sub check_dublicated_env{
    my $yaml =  YAML::Tiny->read( @_[0] );
-   my $controller = YAML::Tiny->new( { name => @_[1] } );
-   my $i=0;
-   while($yaml->[$_[2]]->{spec}->{template}->{spec}->{containers}->[0]->{env}->[$i]){
+   my @control_values = @{$_[1]};
+   my @new_values = (); 
+   
+    foreach $value (@control_values){
+      my $controller = YAML::Tiny->new( { name => $value } );    
+      my $is_duplicated = 0; 
+      my $i=0;
 
-   if($yaml->[$_[2]]->{spec}->{template}->{spec}->{containers}->[0]->{env}->[$i]->{name} eq $controller->[0]->{name}){ 
-   return 1;
-   }
-   $i++;
-   }
-   return 0; 
+      while($yaml->[$_[2]]->{spec}->{template}->{spec}->{containers}->[0]->{env}->[$i]){
+        if($yaml->[$_[2]]->{spec}->{template}->{spec}->{containers}->[0]->{env}->[$i]->{name} eq $controller->[0]->{name}){ 
+         $is_duplicated = 1 ; 
+         last;
+        } 
+        $i++;
+      }
+      if($is_duplicated == 0){
+        push(@new_values,$value);
+      }
+    }
+    return @new_values;
 }
   
 sub is_it_available{
@@ -127,38 +138,44 @@ sub add_env{
   my $yaml =  YAML::Tiny->read( @_[0] );
   my @value_array = @{$_[1]};
   my $yaml_secret = YAML::Tiny->read( @_[3] );
-  my $i=0; 
+  my $i=0;
+
   foreach $value (@value_array){ 
-       
-  $yaml->[@_[2]]->{spec}->{template}->{spec}->{containers}->[0]->{env};
+      
   $yaml->[@_[2]]->{spec}->{template}->{spec}->{containers}->[0]->{env}->[$i]->{name} = $value;
   $yaml->[@_[2]]->{spec}->{template}->{spec}->{containers}->[0]->{env}->[$i]->{valueFrom}->{secretKeyRef}->{name} = $yaml_secret->[0]->{metadata}->{name};
-  $yaml->[@_[2]]->{spec}->{template}->{spec}->{containers}->[0]->{env}->[$i]->{valueFrom}->{secretKeyRef}->{key} = $value ;       
+  $yaml->[@_[2]]->{spec}->{template}->{spec}->{containers}->[0]->{env}->[$i]->{valueFrom}->{secretKeyRef}->{key} = $value;
   $yaml->write( $dirname . @_[0] );
   $i++;
   }
+
   } 
 
 sub add_value{
 
-  #yaml_file,yaml_indexes,value,secret
+  #yaml_file,value_array,secret
   my $yaml =  YAML::Tiny->read( @_[0] );
-  my $yaml_secret = YAML::Tiny->read( @_[3] );
-  my $value =  @_[2];
+  my $yaml_secret = YAML::Tiny->read( @_[1] );
+  my @my_array = @{$_[2]};
   my $i=0;
-
-
-  while($yaml->[@_[1]]->{spec}->{template}->{spec}->{containers}->[0]->{env}->[$i]){
+  while($yaml->[@_[3]]->{spec}->{template}->{spec}->{containers}->[0]->{env}->[$i]){
     $i++;
-  } 
-print "\nadded:" . $value; 
-  $yaml->[@_[1]]->{spec}->{template}->{spec}->{containers}->[0]->{env}->[$i]->{name} = $value;
-  $yaml->[@_[1]]->{spec}->{template}->{spec}->{containers}->[0]->{env}->[$i]->{valueFrom}->{secretKeyRef}->{name} = $yaml_secret->[0]->{metadata}->{name};
-  $yaml->[@_[1]]->{spec}->{template}->{spec}->{containers}->[0]->{env}->[$i]->{valueFrom}->{secretKeyRef}->{key} = $value ;       
-  $yaml->write( $dirname . @_[0] );
+    }
 
+
+foreach $value (@my_array) {
+  $yaml->[@_[3]]->{spec}->{template}->{spec}->{containers}->[0]->{env}->[$i]->{name} = $value;
+  $yaml->[@_[3]]->{spec}->{template}->{spec}->{containers}->[0]->{env}->[$i]->{valueFrom}->{secretKeyRef}->{name} = $yaml_secret->[0]->{metadata}->{name};
+  $yaml->[@_[3]]->{spec}->{template}->{spec}->{containers}->[0]->{env}->[$i]->{valueFrom}->{secretKeyRef}->{key} = $value;
+  $i++;  
+  $yaml->write( $dirname . @_[0] );
+}
 } 
 
+sub delete_quotes{
+  my $file = @_[0];
+   
+}
 
 
 #create format
