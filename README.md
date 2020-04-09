@@ -4,7 +4,7 @@ It creates a new folder named newdir and new yaml files deploy into that folder.
 First argument of script is for specify secret file.If you do not give any argument while running it takes secret file "secrets.yaml" as default.
 You should use " on strings on your yaml files for use this script.
 # TODOS:
-#TODO:reformat it for kubernetes yaml
+#TODO:reformat it for kubernetes yaml \n
 #TODO:include(if there is value in include list only append it) and exclude list for yaml files
 #TODO:include and exclude list for stringData in secrets.yaml
 #TODO:more options.
