@@ -3,7 +3,6 @@
 #perl -MCPAN -e 'install YAML::Tiny'
 use YAML::Tiny;
 
-
 $dirname ="./newdir/";
 mkdir $dirname, 0755;
 
@@ -34,14 +33,6 @@ foreach $yaml (@yamls){
   $yaml = substr($yaml,2);
 }
 
-#TODO:after reformat yaml it is converting int to string.Prevent this.(Tek tırnakları sil)
-#TODO:reformat it for kubernetes yaml
-#TODO:include(if there is value in include list only append it) and exclude list for yaml files
-#TODO:include and exclude list for stringData in secrets.yaml
-#TODO:more options.
-
-
-#=pod
 foreach $yaml (@yamls) {
 
 @indexes = check_kind($yaml);
@@ -58,8 +49,10 @@ add_value($yaml,$secret_file,\@filtered_array,$index);
   add_env($yaml,\@value_array,$index,$secret_file);
 }
 }
+
+system('perl', '-i', '-pe', 's/\'//g',$dirname . $yaml );
+
 }
-#=cut
 
 sub check_kind{
   
@@ -148,7 +141,6 @@ sub add_env{
   $yaml->write( $dirname . @_[0] );
   $i++;
   }
-
   } 
 
 sub add_value{
@@ -162,7 +154,6 @@ sub add_value{
     $i++;
     }
 
-
 foreach $value (@my_array) {
   $yaml->[@_[3]]->{spec}->{template}->{spec}->{containers}->[0]->{env}->[$i]->{name} = $value;
   $yaml->[@_[3]]->{spec}->{template}->{spec}->{containers}->[0]->{env}->[$i]->{valueFrom}->{secretKeyRef}->{name} = $yaml_secret->[0]->{metadata}->{name};
@@ -171,12 +162,6 @@ foreach $value (@my_array) {
   $yaml->write( $dirname . @_[0] );
 }
 } 
-
-sub delete_quotes{
-  my $file = @_[0];
-   
-}
-
 
 #create format
 #format FROMSECRET =
@@ -187,7 +172,7 @@ sub delete_quotes{
 #      name: common
 #      key: @<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 # $val2   
-#.#
+#.
 
 #open(FILE, ">file.txt"); 
 #select FILE; 
